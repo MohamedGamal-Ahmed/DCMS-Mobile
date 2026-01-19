@@ -2,25 +2,32 @@
 export type Category = 'Inbound' | 'Outbound' | 'General';
 
 export interface Correspondence {
-  id: string;
-  code: string;
-  title: string;
-  engineer: string;
-  transferredTo: string;
+  id: number;
+  subject: string;
   date: string;
-  category: Category;
-  status: 'New' | 'Closed' | string;
+  status: string;
+  assignee: string;
+  referenceNumber: string;
+  // Keep old fields for compatibility
+  code?: string;
+  title?: string;
+  engineer?: string;
+  transferredTo?: string;
+  category?: Category;
   reply?: string;
   pdfUrl?: string;
 }
 
 export interface Meeting {
-  id: string;
+  id: number;
   title: string;
-  startTime: Date;
-  attendees: number;
-  status: 'Live' | 'Upcoming';
+  time: string;
+  location: string;
+  participants: number;
   platform: string;
-  location?: string;
+  status: string;
+  // Keep old fields for compatibility
+  startTime?: Date;
+  attendees?: number;
   meetingLink?: string;
 }
