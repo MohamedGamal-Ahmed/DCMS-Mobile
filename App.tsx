@@ -314,7 +314,7 @@ const App: React.FC = () => {
             </div>
 
             {/* PWA Install */}
-            {deferredPrompt && (
+            {deferredPrompt ? (
               <button
                 onClick={handleInstallApp}
                 className="w-full py-5 bg-emerald text-white rounded-[24px] text-base font-black shadow-lg shadow-emerald/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3"
@@ -324,6 +324,21 @@ const App: React.FC = () => {
                 </svg>
                 تثبيت التطبيق على الموبايل
               </button>
+            ) : (
+              /* iOS Specific Notification */
+              /iPhone|iPad|iPod/.test(navigator.userAgent) && !((window.navigator as any).standalone) && (
+                <div className="w-full p-6 bg-blue-50 border border-blue-100 rounded-[28px] space-y-3">
+                  <div className="flex items-center gap-3 text-blue-600">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span className="font-black text-sm">للتثبيت على iPhone</span>
+                  </div>
+                  <p className="text-[11px] text-blue-500 font-bold leading-relaxed">
+                    اضغط على زر <span className="p-1 bg-white rounded border border-blue-200">مشاركة (Share)</span> في متصفح Safari، ثم اختر <span className="px-2 py-0.5 bg-white rounded border border-blue-200">Add to Home Screen</span>.
+                  </p>
+                </div>
+              )
             )}
 
             {/* Logout Action */}
