@@ -14,19 +14,34 @@ const SearchModule: React.FC<SearchModuleProps> = ({ data, loading }) => {
     return data.filter(item => {
       const title = item.subject || item.title || '';
       const code = item.referenceNumber || item.code || '';
-      const engineer = item.assignee || item.engineer || '';
+      const engineer = item.responsibleEngineer || item.assignee || item.engineer || '';
       return title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         engineer.toLowerCase().includes(searchTerm.toLowerCase());
     });
   }, [data, searchTerm]);
 
-  const handleViewPdf = (url?: string) => {
+  const handleViewPdf = (item: Correspondence) => {
+    // Check for attachment URL
+    const url = item.attachmentUrl || item.pdfUrl;
+
     if (url) {
-      window.open(url, '_blank');
+      // If it's a relative URL, prepend the API base
+      const fullUrl = url.startsWith('http')
+        ? url
+        : `https://dcmschat.runasp.net${url.startsWith('/') ? '' : '/'}${url}`;
+      window.open(fullUrl, '_blank');
     } else {
       alert('الملف غير متوفر حالياً');
     }
+  };
+
+  // Get the responsible engineer name
+  const getEngineerName = (item: Correspondence): string => {
+    return item.responsibleEngineer ||
+      item.assignee ||
+      item.engineer ||
+      'غير محدد';
   };
 
   return (
@@ -56,18 +71,22 @@ const SearchModule: React.FC<SearchModuleProps> = ({ data, loading }) => {
                 <div className="flex justify-between items-start mb-3">
                   <span className="text-[11px] font-black text-emerald bg-emerald/5 px-2.5 py-1 rounded-lg border border-emerald/10 uppercase tracking-wider">{item.referenceNumber || item.code}</span>
                   <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border ${item.status === 'New' ? 'text-yellow-700 bg-yellow-50 border-yellow-100' : 'text-gray-500 bg-gray-50 border-gray-100'
-                    }`}>{item.status}</span>
+                    }`}>{item.status === 'New' ? 'جديد' : 'معالج'}</span>
                 </div>
                 <h4 className="text-[14px] font-bold text-gray-900 leading-relaxed mb-4">{item.subject || item.title}</h4>
                 <div className="flex justify-between items-end">
                   <div className="flex flex-col">
                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">المسؤول</span>
-                    <span className="text-[12px] font-bold text-gray-700">{item.assignee || item.engineer || 'غير محدد'}</span>
+                    <span className="text-[12px] font-bold text-gray-700">{getEngineerName(item)}</span>
                     <span className="text-[10px] text-gray-400 mt-1">{item.date}</span>
                   </div>
                   <button
-                    onClick={() => handleViewPdf(item.pdfUrl)}
-                    className="bg-emerald text-white h-10 px-6 rounded-xl text-xs font-black shadow-lg shadow-emerald/20 active:scale-95 transition-all flex items-center gap-2"
+                    onClick={() => handleViewPdf(item)}
+                    className={`h-10 px-6 rounded-xl text-xs font-black shadow-lg active:scale-95 transition-all flex items-center gap-2 ${item.attachmentUrl || item.pdfUrl
+                        ? 'bg-emerald text-white shadow-emerald/20'
+                        : 'bg-gray-100 text-gray-400 shadow-none cursor-not-allowed'
+                      }`}
+                    disabled={!item.attachmentUrl && !item.pdfUrl}
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

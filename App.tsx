@@ -1,27 +1,13 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { initialCorrespondences, initialMeetings } from './mockData';
-import { Correspondence, Meeting } from './types';
+import { Correspondence, Meeting, User, Stats, ApiResponse, LoginResponse } from './types';
 import SearchModule from './components/SearchModule';
 import MeetingsModule from './components/MeetingsModule';
 
 type Tab = 'home' | 'agenda' | 'profile';
 
-interface ApiResponse {
-  user: {
-    name: string;
-    role: string;
-    id: number;
-  };
-  correspondences: Correspondence[];
-  meetings: Meeting[];
-  stats: {
-    meetingsToday: number;
-    pendingIssues: number;
-    completedReports: number;
-  };
-}
+const API_BASE = 'https://dcmschat.runasp.net';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -29,55 +15,133 @@ const App: React.FC = () => {
   const [meetings, setMeetings] = useState<Meeting[]>(initialMeetings);
   const [isLoading, setIsLoading] = useState(true);
   const [dataSaver, setDataSaver] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(true); // Demo state
+  const [user, setUser] = useState<User | null>(null);
+  const [stats, setStats] = useState<Stats>({ meetingsToday: 0, pendingIssues: 0, completedReports: 0 });
 
-  // Fetch real data from API
+  // Login form state
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  // PWA Install prompt
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
+
+  // Check for saved user on mount
+  useEffect(() => {
+    const savedUser = localStorage.getItem('dcms_user');
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        setUser(parsedUser);
+      } catch (e) {
+        localStorage.removeItem('dcms_user');
+      }
+    }
+  }, []);
+
+  // Listen for PWA install prompt
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  // Fetch data when user changes
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
-        // Use full API URL for GitHub Pages deployment
-        const API_BASE = 'https://dcmschat.runasp.net';
-        const response = await fetch(`${API_BASE}/Mobile/GetData`, {
-          credentials: 'include',
-          headers: {
-            'Accept': 'application/json'
-          }
+        const userId = user?.id;
+        const url = userId
+          ? `${API_BASE}/Mobile/GetData?userId=${userId}`
+          : `${API_BASE}/Mobile/GetData`;
+
+        const response = await fetch(url, {
+          headers: { 'Accept': 'application/json' }
         });
+
         if (response.ok) {
           const data: ApiResponse = await response.json();
           setCorrespondences(data.correspondences);
           setMeetings(data.meetings);
+          if (data.stats) setStats(data.stats);
         } else {
           console.warn('Failed to fetch data, using mock data');
         }
       } catch (error) {
         console.error('Error fetching data:', error);
-        // Keep using mock data on error
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchData();
-  }, []);
+  }, [user]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoggedIn(true);
-      setIsLoading(false);
-    }, 600);
+    setLoginError('');
+    setIsLoggingIn(true);
+
+    try {
+      const response = await fetch(`${API_BASE}/Mobile/Login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          username: loginUsername,
+          password: loginPassword
+        })
+      });
+
+      const data: LoginResponse = await response.json();
+
+      if (data.success && data.user) {
+        setUser(data.user);
+        localStorage.setItem('dcms_user', JSON.stringify(data.user));
+        setActiveTab('home');
+        setLoginUsername('');
+        setLoginPassword('');
+      } else {
+        setLoginError(data.message || 'خطأ في تسجيل الدخول');
+      }
+    } catch (error) {
+      setLoginError('فشل الاتصال بالخادم');
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
+    setUser(null);
+    localStorage.removeItem('dcms_user');
     setActiveTab('profile');
   };
 
+  const handleInstallApp = async () => {
+    if (!deferredPrompt) return;
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+
+    if (outcome === 'accepted') {
+      setShowInstallBanner(false);
+    }
+    setDeferredPrompt(null);
+  };
+
   const renderContent = () => {
-    if (!isLoggedIn && activeTab === 'profile') {
+    // Not logged in - show login on profile tab
+    if (!user && activeTab === 'profile') {
       return (
         <div className="animate-fade-in px-6 py-12 flex flex-col items-center">
           <div className="w-20 h-20 bg-emerald/10 rounded-3xl flex items-center justify-center text-emerald mb-8 shadow-inner">
@@ -86,13 +150,21 @@ const App: React.FC = () => {
           <h2 className="text-2xl font-black text-gray-900 mb-2">تسجيل الدخول</h2>
           <p className="text-gray-400 font-bold text-sm mb-10 text-center">يرجى إدخال بيانات الاعتماد الخاصة بك للوصول إلى نظام المراسلات</p>
 
+          {loginError && (
+            <div className="w-full mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl text-red-600 text-sm font-bold text-center">
+              {loginError}
+            </div>
+          )}
+
           <form className="w-full space-y-5" onSubmit={handleLogin}>
             <div className="space-y-1.5">
-              <label className="text-xs font-black text-gray-500 pr-1">البريد الإلكتروني</label>
+              <label className="text-xs font-black text-gray-500 pr-1">اسم المستخدم</label>
               <input
-                type="email"
-                placeholder="eng.ahmed@company.com"
+                type="text"
+                placeholder="username"
                 className="w-full h-14 px-5 bg-white border border-gray-200 rounded-2xl text-sm focus:border-emerald outline-none shadow-sm transition-all"
+                value={loginUsername}
+                onChange={(e) => setLoginUsername(e.target.value)}
                 required
               />
             </div>
@@ -102,18 +174,17 @@ const App: React.FC = () => {
                 type="password"
                 placeholder="••••••••"
                 className="w-full h-14 px-5 bg-white border border-gray-200 rounded-2xl text-sm focus:border-emerald outline-none shadow-sm transition-all"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
                 required
               />
             </div>
-            <div className="flex items-center gap-2 pt-2">
-              <input type="checkbox" id="remember" className="w-4 h-4 accent-emerald" />
-              <label htmlFor="remember" className="text-xs font-bold text-gray-600">تذكر بياناتي</label>
-            </div>
             <button
               type="submit"
-              className="w-full h-16 bg-emerald text-white rounded-[24px] font-black text-base shadow-xl shadow-emerald/20 active:scale-[0.98] transition-all mt-4"
+              disabled={isLoggingIn}
+              className="w-full h-16 bg-emerald text-white rounded-[24px] font-black text-base shadow-xl shadow-emerald/20 active:scale-[0.98] transition-all mt-4 disabled:opacity-50"
             >
-              دخول النظام
+              {isLoggingIn ? 'جاري الدخول...' : 'دخول النظام'}
             </button>
           </form>
           <p className="mt-8 text-[11px] font-bold text-gray-400">نسيت كلمة المرور؟ تواصل مع الدعم الفني</p>
@@ -121,14 +192,15 @@ const App: React.FC = () => {
       );
     }
 
-    if (!isLoggedIn) {
+    // Not logged in - show restricted access on other tabs
+    if (!user) {
       return (
         <div className="h-[60vh] flex flex-col items-center justify-center px-10 text-center">
           <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300 mb-4">
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
           </div>
           <h3 className="text-lg font-black text-gray-900 mb-2">الوصول مقيد</h3>
-          <p className="text-sm font-bold text-gray-400">يرجى تسجيل الدخول أولاً لعرض البيانات الحساسة</p>
+          <p className="text-sm font-bold text-gray-400">يرجى تسجيل الدخول أولاً لعرض البيانات</p>
           <button
             onClick={() => setActiveTab('profile')}
             className="mt-6 px-8 py-3 bg-emerald text-white rounded-xl font-black text-sm shadow-lg shadow-emerald/10"
@@ -139,12 +211,38 @@ const App: React.FC = () => {
       );
     }
 
+    // Logged in - show content
     switch (activeTab) {
       case 'home':
         return (
           <main className="animate-fade-in space-y-8 py-2">
+            {/* Install Banner */}
+            {showInstallBanner && (
+              <div className="mx-5 bg-gradient-to-r from-emerald to-emerald/80 rounded-2xl p-4 flex items-center justify-between shadow-lg shadow-emerald/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                    <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="text-white font-bold text-sm">ثبّت التطبيق</p>
+                    <p className="text-white/70 text-[10px]">أضف التطبيق للشاشة الرئيسية</p>
+                  </div>
+                </div>
+                <button
+                  onClick={handleInstallApp}
+                  className="bg-white text-emerald px-4 py-2 rounded-xl text-xs font-black shadow-md active:scale-95 transition-all"
+                >
+                  تثبيت
+                </button>
+              </div>
+            )}
+
             <div className="px-5 mt-4">
-              <h2 className="text-xl font-black text-gray-900 leading-tight">أهلاً بك، مهندس أحمد</h2>
+              <h2 className="text-xl font-black text-gray-900 leading-tight">
+                أهلاً بك، {user.name}
+              </h2>
               <div className="w-10 h-1.5 bg-emerald rounded-full mt-1.5 shadow-sm shadow-emerald/10"></div>
             </div>
             <MeetingsModule meetings={meetings} loading={isLoading} viewType="home" />
@@ -172,27 +270,27 @@ const App: React.FC = () => {
                   <svg className="w-4 h-4 text-emerald" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.64.304 1.24.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
                 </div>
               </div>
-              <h2 className="text-xl font-black text-gray-900">م/ أحمد العصار</h2>
-              <p className="text-gray-400 font-bold text-xs mt-1 uppercase tracking-wider">مهندس أول - قطاع الطرق والكباري</p>
+              <h2 className="text-xl font-black text-gray-900">{user.name}</h2>
+              <p className="text-gray-400 font-bold text-xs mt-1 uppercase tracking-wider">{user.role}</p>
             </div>
 
-            {/* Read-only Stats Dashboard */}
+            {/* Stats Dashboard */}
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-center">
-                <span className="text-[18px] font-black text-emerald block">٠٣</span>
+                <span className="text-[18px] font-black text-emerald block">{stats.meetingsToday.toString().padStart(2, '0')}</span>
                 <span className="text-[8px] font-bold text-gray-400 uppercase leading-tight">اجتماعاتي اليوم</span>
               </div>
               <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-center">
-                <span className="text-[18px] font-black text-blue-600 block">٠٥</span>
+                <span className="text-[18px] font-black text-blue-600 block">{stats.pendingIssues.toString().padStart(2, '0')}</span>
                 <span className="text-[8px] font-bold text-gray-400 uppercase leading-tight">مواضيع معلقة</span>
               </div>
               <div className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm text-center">
-                <span className="text-[18px] font-black text-purple-600 block">٢٤</span>
+                <span className="text-[18px] font-black text-purple-600 block">{stats.completedReports}</span>
                 <span className="text-[8px] font-bold text-gray-400 uppercase leading-tight">تقارير منجزة</span>
               </div>
             </div>
 
-            {/* Account Security Settings */}
+            {/* Account Settings */}
             <div className="space-y-3">
               <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">أمان الحساب</h3>
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm divide-y divide-gray-50 overflow-hidden">
