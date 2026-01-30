@@ -76,7 +76,13 @@ const App: React.FC = () => {
           setMeetings(data.meetings || []);
           if (data.stats) setStats(data.stats);
         } else {
-          setError('فشل جلب البيانات من الخادم');
+          // Try to read error message from JSON body
+          try {
+            const errorData = await response.json();
+            setError(errorData.message || 'فشل جلب البيانات من الخادم (Status: ' + response.status + ')');
+          } catch (e) {
+            setError(`فشل جلب البيانات من الخادم (Status: ${response.status})`);
+          }
           setCorrespondences([]);
           setMeetings([]);
         }
