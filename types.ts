@@ -10,16 +10,13 @@ export interface Correspondence {
   // Responsible engineer name
   responsibleEngineer?: string;
   // Attachment URL for PDF
-  attachmentUrl?: string;
-  // Keep old fields for compatibility
-  assignee?: string;
-  code?: string;
-  title?: string;
-  engineer?: string;
-  transferredTo?: string;
+  description?: string;
+  originalAttachmentUrl?: string;
+  replyAttachmentUrl?: string;
   category?: Category;
   reply?: string;
   pdfUrl?: string;
+  attachments?: { title: string; url: string; type: 'original' | 'reply' | 'other' }[];
 }
 
 export interface Meeting {

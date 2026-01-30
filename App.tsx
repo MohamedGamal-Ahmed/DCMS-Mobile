@@ -17,6 +17,7 @@ const App: React.FC = () => {
   const [dataSaver, setDataSaver] = useState(false);
   const [user, setUser] = useState<User | null>(null);
   const [stats, setStats] = useState<Stats>({ meetingsToday: 0, pendingIssues: 0, completedReports: 0 });
+  const [selectedItem, setSelectedItem] = useState<Correspondence | null>(null);
 
   // Login form state
   const [loginUsername, setLoginUsername] = useState('');
@@ -139,6 +140,14 @@ const App: React.FC = () => {
     setDeferredPrompt(null);
   };
 
+  const handleOpenPdf = (url?: string) => {
+    if (!url) return;
+    const fullUrl = url.startsWith('http')
+      ? url
+      : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
+    window.open(fullUrl, '_blank');
+  };
+
   const renderContent = () => {
     // Not logged in - show login on profile tab
     if (!user && activeTab === 'profile') {
@@ -250,7 +259,7 @@ const App: React.FC = () => {
               <div className="px-5">
                 <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest border-r-4 border-emerald pr-3">المراسلات الأخيرة</h3>
               </div>
-              <SearchModule data={correspondences} loading={isLoading} />
+              <SearchModule data={correspondences} loading={isLoading} onSelectItem={setSelectedItem} />
             </div>
           </main>
         );
@@ -387,6 +396,98 @@ const App: React.FC = () => {
       </header>
 
       {renderContent()}
+
+      {/* Detail Modal */}
+      {selectedItem && (
+        <div className="fixed inset-0 z-[100] flex items-end justify-center">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm shadow-inner" onClick={() => setSelectedItem(null)}></div>
+          <div className="bg-white w-full max-w-lg rounded-t-[40px] p-8 pb-12 relative animate-slide-up shadow-2xl border-t border-gray-100 flex flex-col gap-6">
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto -mt-2"></div>
+
+            <div className="flex justify-between items-start">
+              <div className="flex gap-2">
+                <span className="text-[11px] font-black text-emerald bg-emerald/5 px-2.5 py-1 rounded-lg border border-emerald/10 uppercase tracking-widest">
+                  {selectedItem.referenceNumber}
+                </span>
+                <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border border-gray-100 uppercase tracking-widest ${selectedItem.category === 'Inbound' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                  {selectedItem.category === 'Inbound' ? 'وارد' : 'صادر'}
+                </span>
+              </div>
+              <span className={`text-[10px] font-black px-3 py-1.5 rounded-full border ${selectedItem.status === 'New' ? 'text-yellow-700 bg-yellow-50 border-yellow-100' : 'text-gray-500 bg-gray-50 border-gray-100'}`}>
+                {selectedItem.status === 'New' ? 'جديد' : 'معالج'}
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-xl font-black text-gray-900 leading-tight">{selectedItem.subject}</h3>
+              <div className="flex items-center gap-3 text-gray-400 font-bold text-xs uppercase tracking-wider">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                {selectedItem.date} • {selectedItem.responsibleEngineer}
+              </div>
+            </div>
+
+            <div className="h-px bg-gray-50"></div>
+
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">التفاصيل والملاحظات</h4>
+              <div className="bg-gray-50/50 p-5 rounded-[24px] border border-gray-100/50">
+                <p className="text-sm font-bold text-gray-700 leading-relaxed whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar">
+                  {selectedItem.description || "لا يوجد تفاصيل إضافية مسجلة لهذا الموضوع."}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 mt-2">
+              <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">المرفقات المتاحة</h4>
+              <div className="grid grid-cols-1 gap-3">
+                {selectedItem.attachments && selectedItem.attachments.length > 0 ? (
+                  selectedItem.attachments.map((att, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleOpenPdf(att.url)}
+                      className={`w-full h-18 bg-white border-2 p-4 rounded-2xl flex items-center justify-between transition-all shadow-sm active:scale-[0.98] ${att.type === 'original' ? 'border-emerald/20 hover:bg-emerald/5' :
+                          att.type === 'reply' ? 'border-blue-100 hover:bg-blue-50' : 'border-gray-100 hover:bg-gray-50'
+                        }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${att.type === 'original' ? 'bg-emerald/10 text-emerald' :
+                            att.type === 'reply' ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-400'
+                          }`}>
+                          {att.type === 'original' ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                          ) : att.type === 'reply' ? (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" /></svg>
+                          ) : (
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                          )}
+                        </div>
+                        <div className="flex flex-col text-right">
+                          <span className="text-sm font-black text-gray-900">{att.title}</span>
+                          <span className="text-[10px] font-bold text-gray-400">
+                            {att.type === 'original' ? 'عرض المرفق الأساسي' : att.type === 'reply' ? 'عرض ملف الرد المباشر' : 'مرفق إضافي متاح للموضوع'}
+                          </span>
+                        </div>
+                      </div>
+                      <svg className="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" /></svg>
+                    </button>
+                  ))
+                ) : (
+                  <div className="p-8 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                    <p className="text-xs font-bold text-gray-400">لا توجد ملفات مرفقة متاحة حالياً</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedItem(null)}
+              className="w-full py-5 bg-gray-900 text-white rounded-[28px] font-black text-sm shadow-xl shadow-gray-200 active:scale-95 transition-all mt-4"
+            >
+              إغلاق النافذة
+            </button>
+          </div>
+        </div>
+      )}
 
       <nav className="fixed bottom-0 left-0 right-0 h-22 bg-white/95 backdrop-blur-md border-t border-gray-100 px-10 flex items-center justify-between z-50 shadow-[0_-5px_20px_rgba(0,0,0,0.03)] pb-4">
         <button

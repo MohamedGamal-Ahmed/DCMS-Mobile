@@ -5,16 +5,17 @@ import { Correspondence } from '../types';
 interface SearchModuleProps {
   data: Correspondence[];
   loading?: boolean;
+  onSelectItem?: (item: Correspondence) => void;
 }
 
-const SearchModule: React.FC<SearchModuleProps> = ({ data, loading }) => {
+const SearchModule: React.FC<SearchModuleProps> = ({ data, loading, onSelectItem }) => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredData = useMemo(() => {
     return data.filter(item => {
-      const title = item.subject || item.title || '';
-      const code = item.referenceNumber || item.code || '';
-      const engineer = item.responsibleEngineer || item.assignee || item.engineer || '';
+      const title = item.subject || '';
+      const code = item.referenceNumber || '';
+      const engineer = item.responsibleEngineer || '';
       return title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         engineer.toLowerCase().includes(searchTerm.toLowerCase());
@@ -23,7 +24,7 @@ const SearchModule: React.FC<SearchModuleProps> = ({ data, loading }) => {
 
   const handleViewPdf = (item: Correspondence) => {
     // Check for attachment URL
-    const url = item.attachmentUrl || item.pdfUrl;
+    const url = item.originalAttachmentUrl || item.replyAttachmentUrl || item.pdfUrl;
 
     if (url) {
       // If it's a relative URL, prepend the API base
@@ -38,10 +39,7 @@ const SearchModule: React.FC<SearchModuleProps> = ({ data, loading }) => {
 
   // Get the responsible engineer name
   const getEngineerName = (item: Correspondence): string => {
-    return item.responsibleEngineer ||
-      item.assignee ||
-      item.engineer ||
-      'غير محدد';
+    return item.responsibleEngineer || 'غير محدد';
   };
 
   return (
@@ -67,9 +65,18 @@ const SearchModule: React.FC<SearchModuleProps> = ({ data, loading }) => {
             <div className="h-32 skeleton rounded-2xl"></div>
           ) : filteredData.length > 0 ? (
             filteredData.map((item) => (
-              <div key={item.id} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+              <div
+                key={item.id}
+                className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm active:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => onSelectItem?.(item)}
+              >
                 <div className="flex justify-between items-start mb-3">
-                  <span className="text-[11px] font-black text-emerald bg-emerald/5 px-2.5 py-1 rounded-lg border border-emerald/10 uppercase tracking-wider">{item.referenceNumber || item.code}</span>
+                  <div className="flex gap-2">
+                    <span className="text-[11px] font-black text-emerald bg-emerald/5 px-2.5 py-1 rounded-lg border border-emerald/10 uppercase tracking-wider">{item.referenceNumber || item.code}</span>
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border border-gray-100 uppercase tracking-wider ${item.category === 'Inbound' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'}`}>
+                      {item.category === 'Inbound' ? 'وارد' : 'صادر'}
+                    </span>
+                  </div>
                   <span className={`text-[10px] font-black px-2.5 py-1 rounded-lg border ${item.status === 'New' ? 'text-yellow-700 bg-yellow-50 border-yellow-100' : 'text-gray-500 bg-gray-50 border-gray-100'
                     }`}>{item.status === 'New' ? 'جديد' : 'معالج'}</span>
                 </div>
@@ -81,18 +88,12 @@ const SearchModule: React.FC<SearchModuleProps> = ({ data, loading }) => {
                     <span className="text-[10px] text-gray-400 mt-1">{item.date}</span>
                   </div>
                   <button
-                    onClick={() => handleViewPdf(item)}
-                    className={`h-10 px-6 rounded-xl text-xs font-black shadow-lg active:scale-95 transition-all flex items-center gap-2 ${item.attachmentUrl || item.pdfUrl
-                        ? 'bg-emerald text-white shadow-emerald/20'
-                        : 'bg-gray-100 text-gray-400 shadow-none cursor-not-allowed'
-                      }`}
-                    disabled={!item.attachmentUrl && !item.pdfUrl}
+                    className="h-10 px-4 rounded-xl text-xs font-black bg-gray-50 text-emerald border border-gray-100 shadow-sm active:scale-95 transition-all flex items-center gap-2"
                   >
+                    التفاصيل
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9 5l7 7-7 7" />
                     </svg>
-                    عرض PDF
                   </button>
                 </div>
               </div>
