@@ -7,7 +7,7 @@ import MeetingsModule from './components/MeetingsModule';
 
 type Tab = 'home' | 'agenda' | 'profile';
 
-const API_BASE = 'https://unpredatory-perisarcous-jessenia.ngrok-free.dev';
+const API_BASE = 'https://mr-mohamed-gamal.tail1acc6c.ts.net';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<Tab>('home');
@@ -70,8 +70,7 @@ const App: React.FC = () => {
           headers: {
             'Accept': 'application/json',
             'Cache-Control': 'no-cache, no-store, must-revalidate',
-            'Pragma': 'no-cache',
-            'ngrok-skip-browser-warning': '69420'
+            'Pragma': 'no-cache'
           },
           cache: 'no-store'
         });
@@ -115,8 +114,7 @@ const App: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'ngrok-skip-browser-warning': '69420'
+          'Accept': 'application/json'
         },
         body: JSON.stringify({
           username: loginUsername,

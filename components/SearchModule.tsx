@@ -30,7 +30,7 @@ const SearchModule: React.FC<SearchModuleProps> = ({ data, loading, onSelectItem
       // If it's a relative URL, prepend the API base
       const fullUrl = url.startsWith('http')
         ? url
-        : `https://unpredatory-perisarcous-jessenia.ngrok-free.dev${url.startsWith('/') ? '' : '/'}${url}`;
+        : `https://mr-mohamed-gamal.tail1acc6c.ts.net${url.startsWith('/') ? '' : '/'}${url}`;
       window.open(fullUrl, '_blank');
     } else {
       alert('الملف غير متوفر حالياً');
